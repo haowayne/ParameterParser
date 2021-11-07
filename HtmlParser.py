@@ -1,7 +1,35 @@
 import os
-
-import esprima
 from bs4 import BeautifulSoup
+
+all_files = []
+known_urls = []
+
+post_http = '''
+POST /{1} HTTP/1.1\r\n\
+Host: 192.168.0.1\r\n\
+Cookie: {2}\r\n\
+Connection: close\r\n\r\n\
+{3}
+'''
+
+get_http = '''
+GET /{1} HTTP/1.1\r\n\
+Host: 192.168.0.1\r\n\
+Cookie: {2}\r\n\
+Connection: close\r\n\r\n\
+'''
+
+
+def list_all_files(path):
+    lsdir = os.listdir(path)
+    dirs = [i for i in lsdir if os.path.isdir(os.path.join(
+        path, i))]
+    if dirs:
+        for i in dirs:
+            list_all_files(os.path.join(path, i))
+    files = [i for i in lsdir if os.path.isfile(os.path.join(path, i))]
+    for f in files:
+        all_files.append(os.path.join(path, f))
 
 
 # todo:html中script的提取分析在javascript模块完成后完善
@@ -43,7 +71,7 @@ if __name__ == '__main__':
     res = []
     file_list = os.listdir(('./test/tenda ax3'))
     for i in file_list:
-        if 'htm' in i:
+        if '.htm' in i:
             with open('./test/tenda ax3/' + i, 'r') as f:
                 res += HtmlParser(f.read())
     for i in res:
