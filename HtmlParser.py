@@ -1,5 +1,8 @@
 import os
+
+import esprima
 from bs4 import BeautifulSoup
+import os
 
 all_files = []
 known_urls = []
@@ -19,20 +22,18 @@ Cookie: {2}\r\n\
 Connection: close\r\n\r\n\
 '''
 
-
 def list_all_files(path):
     lsdir = os.listdir(path)
     dirs = [i for i in lsdir if os.path.isdir(os.path.join(
-        path, i))]
+path, i))]
     if dirs:
         for i in dirs:
             list_all_files(os.path.join(path, i))
-    files = [i for i in lsdir if os.path.isfile(os.path.join(path, i))]
+    files = [i for i in lsdir if os.path.isfile(os.path.join(path,i))]
     for f in files:
-        all_files.append(os.path.join(path, f))
+       all_files.append(os.path.join(path, f))
 
-
-# todo:html中script的提取分析在javascript模块完成后完善
+# todo: javascript in html
 def HtmlParser(body):
     body_soup = BeautifulSoup(body, 'lxml')
     tag_form_list = body_soup.find_all('form')
@@ -68,11 +69,14 @@ def HtmlParser(body):
 
 
 if __name__ == '__main__':
+    path = './ac9_webroot_ro'
+    list_all_files(path)
     res = []
     file_list = os.listdir(('./test/tenda ax3'))
     for i in file_list:
-        if '.htm' in i:
+        if 'htm' in i:
             with open('./test/tenda ax3/' + i, 'r') as f:
                 res += HtmlParser(f.read())
     for i in res:
         print(i)
+
