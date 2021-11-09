@@ -1,26 +1,13 @@
+#coding=utf-8
 import os
 
-import esprima
+# import esprima
 from bs4 import BeautifulSoup
 import os
+from ParameterParser.util import packet
 
 all_files = []
 known_urls = []
-
-post_http = '''
-POST /{1} HTTP/1.1\r\n\
-Host: 192.168.0.1\r\n\
-Cookie: {2}\r\n\
-Connection: close\r\n\r\n\
-{3}
-'''
-
-get_http = '''
-GET /{1} HTTP/1.1\r\n\
-Host: 192.168.0.1\r\n\
-Cookie: {2}\r\n\
-Connection: close\r\n\r\n\
-'''
 
 def list_all_files(path):
     lsdir = os.listdir(path)
@@ -40,13 +27,14 @@ def HtmlParser(body):
     res_list = []
     for tag_form in tag_form_list:
         try:
-            form_action = tag_form['action']
+            form_action = tag_form['action'].lstrip('//')
+            known_urls.append(form_action)
         except KeyError:
             form_action = ''
         try:
             form_method = tag_form['method'].upper()
         except KeyError:
-            form_method = 'GET'
+            form_method = ''
         r = {
             'url': form_action,
             'method': form_method,
@@ -69,14 +57,20 @@ def HtmlParser(body):
 
 
 if __name__ == '__main__':
-    path = './ac9_webroot_ro'
+    path = '../ac9_webroot_ro'
+    ip = "http://192.168.0.1"
+    cookie = ''
     list_all_files(path)
     res = []
-    file_list = os.listdir(('./test/tenda ax3'))
+    file_list = os.listdir(path)
     for i in file_list:
-        if 'htm' in i:
-            with open('./test/tenda ax3/' + i, 'r') as f:
-                res += HtmlParser(f.read())
-    for i in res:
-        print(i)
+        if '.htm' in i:
+            with open('../ac9_webroot_ro/' + i, 'r') as f:
+                print(i)
+                res += HtmlParser(f.read().encode())
+    res = sorted(res, key= lambda i:i.__getitem__('url'),reverse=True)
+
+    # for i in res:
+    #     print(i)
+    packet.auto_send_packet(ip,res,known_urls,cookie)
 

@@ -10,6 +10,7 @@ class UnknownNodeTypeError(Exception):
 class Node(abc.ABC):
     @abc.abstractmethod
     def fields(self) -> List[str]:
+        pass
 
     def __init__(self, data: Dict[str, Any], parent: Union['Node', None] = None) -> None:
         self.__parent = parent
