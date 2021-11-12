@@ -1,24 +1,26 @@
-#coding=utf-8
+# coding=utf-8
 import os
 
 # import esprima
 from bs4 import BeautifulSoup
 import os
-from ParameterParser.util import packet
+from util import packet
 
 all_files = []
 known_urls = []
 
+
 def list_all_files(path):
     lsdir = os.listdir(path)
     dirs = [i for i in lsdir if os.path.isdir(os.path.join(
-path, i))]
+        path, i))]
     if dirs:
         for i in dirs:
             list_all_files(os.path.join(path, i))
-    files = [i for i in lsdir if os.path.isfile(os.path.join(path,i))]
+    files = [i for i in lsdir if os.path.isfile(os.path.join(path, i))]
     for f in files:
-       all_files.append(os.path.join(path, f))
+        all_files.append(os.path.join(path, f))
+
 
 # todo: javascript in html
 def HtmlParser(body):
@@ -68,9 +70,5 @@ if __name__ == '__main__':
             with open('../ac9_webroot_ro/' + i, 'r') as f:
                 print(i)
                 res += HtmlParser(f.read().encode())
-    res = sorted(res, key= lambda i:i.__getitem__('url'),reverse=True)
-
-    # for i in res:
-    #     print(i)
-    packet.auto_send_packet(ip,res,known_urls,cookie)
-
+    res = sorted(res, key=lambda i: i.__getitem__('url'), reverse=True)
+    packet.auto_send_packet(ip, res, known_urls, cookie)

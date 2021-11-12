@@ -39,10 +39,10 @@ class Node(abc.ABC):
                 for node in val:
                     yield from node.traverse()
 
-    def search_by_type(self, type) -> List['Node']:
+    def search_by_type(self, node_type) -> List['Node']:
         search_list = []
         for node in self.traverse():
-            if node.type == type:
+            if node.type == node_type:
                 search_list.append(node)
         return search_list
 
