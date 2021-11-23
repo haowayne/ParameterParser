@@ -5,6 +5,40 @@ import itertools
 from util import visitor
 
 
+def check_call_expression(node):
+    if node.callee.type == 'MemberExpression':
+        if hasattr(node.callee.object, 'name') and node.callee.object.name == '$':
+            if node.callee.property.name == 'get':
+                return 'get'
+            if node.callee.property.name == 'post':
+                return 'post'
+            if node.callee.property.name == 'ajax':
+                return 'ajax'
+    return 'not target callee'
+
+
+def find_url(node):
+    pass
+
+
+def new_js_parser(program):
+    ast = esprima.parseScript(program).toDict()
+    program = visitor.objectify(ast)
+    call_expression_node_list = program.search_by_type('CallExpression')
+    for call_expression_node in call_expression_node_list:
+        callee_name = check_call_expression(call_expression_node)
+        if callee_name == 'get':
+            # print(callee_name)
+            url_node = call_expression_node.arguments[0]
+        if callee_name == 'post':
+            if call_expression_node.arguments[0].type == 'Literal':
+                url = call_expression_node.arguments[0].value
+                print(url, end='   ')
+            print(call_expression_node.arguments[0].type)
+        if callee_name == 'ajax':
+            print(callee_name)
+
+
 def match_url(check_string):
     if isinstance(check_string, str):
         url_match_restr_1 = r'/([\w.\/?%&=]*)?'
@@ -16,21 +50,17 @@ def match_url(check_string):
     return False
 
 
-def new_js_parser():
-    # todo:迭代精准搜索url和keyword
-    pass
-
-
 def JSParser(program):
     ast = esprima.parseScript(program).toDict()
     program = visitor.objectify(ast)
     literal_node_list = program.search_by_type('Literal')
-    object_node_lsit = program.search_by_type('ObjectExpression')
     url_list = []
-    kerword_list = []
     for literal_node in literal_node_list:
         if match_url(literal_node.value):
             url_list.append(literal_node.value)
+
+    object_node_lsit = program.search_by_type('ObjectExpression')
+    kerword_list = []
     for object in object_node_lsit:
         target_flag = 1
         for property in object.properties:
@@ -62,11 +92,15 @@ def JSParser(program):
 if __name__ == '__main__':
     res = []
     file_list = os.listdir(('./test/tenda ax3/js'))
-    for i in file_list:
-        if os.path.isfile(os.path.join(os.getcwd(), './test/tenda ax3/js', i)):
-            with open('./test/tenda ax3/js/' + i, 'r') as f:
-                print(i)
-                res = JSParser(f.read())
-                for i in res:
-                    print(i)
-                print()
+    with open("./test/tenda ax3/js/net_control.js",'r') as f:
+        a = esprima.parseScript(f.read())
+        print(a)
+    # for i in file_list:
+    #     if os.path.isfile(os.path.join(os.getcwd(), './test/tenda ax3/js', i)):
+    #         with open('./test/tenda ax3/js/' + i, 'r') as f:
+    #             # res = JSParser(f.read())
+    #             print(i)
+    #             new_js_parser(f.read())
+    #             print()
+    #             # for i in res:
+    #             #     print(i)

@@ -54,6 +54,8 @@ class Node(abc.ABC):
     def parent(self):
         return self.__parent
 
+    def findParent(self):
+        pass
 
 def objectify(data: Union[None, Dict[str, Any], List[Dict[str, Any]]], parent=None) -> Union[
     None, Dict[str, Any], List[Any], Node]:
