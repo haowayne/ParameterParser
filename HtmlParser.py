@@ -5,25 +5,16 @@ import os
 from bs4 import BeautifulSoup
 import os
 from util import packet
+from util import tools
 
-all_files = []
+MAX_THRESHOLD = 5
+
 known_urls = []
-
-
-def list_all_files(path):
-    lsdir = os.listdir(path)
-    dirs = [i for i in lsdir if os.path.isdir(os.path.join(
-        path, i))]
-    if dirs:
-        for i in dirs:
-            list_all_files(os.path.join(path, i))
-    files = [i for i in lsdir if os.path.isfile(os.path.join(path, i))]
-    for f in files:
-        all_files.append(os.path.join(path, f))
-
+all_js_script_list = []
 
 # todo: javascript in html
 def HtmlParser(body):
+    global known_urls
     body_soup = BeautifulSoup(body, 'lxml')
     tag_form_list = body_soup.find_all('form')
     res_list = []
@@ -55,20 +46,50 @@ def HtmlParser(body):
                     attr_val = ''
                 r['parameter'][attr_name] = attr_val
         res_list.append(r)
+
+    tag_src_list = body_soup.find_all('script',{"src" : True})
+    js_script_list = []
+    for js in tag_src_list:
+        js_script_list.append(js['src'].strip('./'))
+    all_js_script_list.append(js_script_list)
+
     return res_list
 
+def classify_all_js_script_list():
+    global all_js_script_list
+    all_js_script_dict = {}
+    for item in all_js_script_list:
+        for js in item:
+            if all_js_script_dict.get(js) == None:
+                all_js_script_dict[js] = 1
+            else:
+                all_js_script_dict[js] += 1
+
+    for i in range(len(all_js_script_list)):
+        temp = dict(self_js=[],public_js=[])
+        for js in all_js_script_list[i]:
+            if all_js_script_dict[js] >= MAX_THRESHOLD:
+                temp['public_js'].append(js)
+            else:
+                temp['self_js'].append(js)
+        all_js_script_list[i] = temp
+
+    print(all_js_script_dict)
 
 if __name__ == '__main__':
-    path = '../ac9_webroot_ro'
+    path = '../webroot_ro'
     ip = "http://192.168.0.1"
     cookie = ''
-    list_all_files(path)
     res = []
-    file_list = os.listdir(path)
+
+    file_list = []
+    file_list = tools.list_all_files(path,file_list)
     for i in file_list:
         if '.htm' in i:
-            with open('../ac9_webroot_ro/' + i, 'r') as f:
+            with open('../webroot_ro/' + i, 'r') as f:
                 print(i)
                 res += HtmlParser(f.read().encode())
+
+    classify_all_js_script_list()
     res = sorted(res, key=lambda i: i.__getitem__('url'), reverse=True)
-    packet.auto_send_packet(ip, res, known_urls, cookie)
+    # packet.auto_send_packet(ip, res, known_urls, cookie)

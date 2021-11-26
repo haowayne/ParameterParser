@@ -50,51 +50,50 @@ def match_url(check_string):
     return False
 
 
-def JSParser(program):
-    ast = esprima.parseScript(program).toDict()
-    program = visitor.objectify(ast)
-    literal_node_list = program.search_by_type('Literal')
-    url_list = []
-    for literal_node in literal_node_list:
-        if match_url(literal_node.value):
-            url_list.append(literal_node.value)
-
-    object_node_lsit = program.search_by_type('ObjectExpression')
-    kerword_list = []
-    for object in object_node_lsit:
-        target_flag = 1
-        for property in object.properties:
-            if property.value.type != 'Identifier' and property.value.type != 'Literal' and property.value.type != 'CallExpression':
-                target_flag = 0
-        if target_flag:
-            keyword = []
-            for property in object.properties:
-                if property.key.type == 'Identifier':
-                    keyword.append(property.key.name)
-                elif property.key.type == 'Literal':
-                    keyword.append(property.key.value)
-            if len(keyword) != 0:
-                kerword_list.append(keyword)
-    combine = itertools.product(url_list, ['GET', 'POST'], kerword_list)
-    request_list = []
-    for i in combine:
-        req = {
-            'url': i[0],
-            'method': i[1],
-            'parameter': {}
-        }
-        for key in i[2]:
-            req['parameter'][key] = ''
-        request_list.append(req)
-    return request_list
+# def JSParser(program):
+#     ast = esprima.parseScript(program).toDict()
+#     program = visitor.objectify(ast)
+#     literal_node_list = program.search_by_type('Literal')
+#     url_list = []
+#     for literal_node in literal_node_list:
+#         if match_url(literal_node.value):
+#             url_list.append(literal_node.value)
+#
+#     object_node_lsit = program.search_by_type('ObjectExpression')
+#     kerword_list = []
+#     for object in object_node_lsit:
+#         target_flag = 1
+#         for property in object.properties:
+#             if property.value.type != 'Identifier' and property.value.type != 'Literal' and property.value.type != 'CallExpression':
+#                 target_flag = 0
+#         if target_flag:
+#             keyword = []
+#             for property in object.properties:
+#                 if property.key.type == 'Identifier':
+#                     keyword.append(property.key.name)
+#                 elif property.key.type == 'Literal':
+#                     keyword.append(property.key.value)
+#             if len(keyword) != 0:
+#                 kerword_list.append(keyword)
+#     combine = itertools.product(url_list, ['GET', 'POST'], kerword_list)
+#     request_list = []
+#     for i in combine:
+#         req = {
+#             'url': i[0],
+#             'method': i[1],
+#             'parameter': {}
+#         }
+#         for key in i[2]:
+#             req['parameter'][key] = ''
+#         request_list.append(req)
+#     return request_list
 
 
 if __name__ == '__main__':
     res = []
-    file_list = os.listdir(('./test/tenda ax3/js'))
-    with open("./test/tenda ax3/js/net_control.js",'r') as f:
-        a = esprima.parseScript(f.read())
-        print(a)
+    file_list = os.listdir(('../webroot_ro/js'))
+    with open("../webroot_ro/js/anti_interference.js",'r') as f:
+        new_js_parser(f.read())
     # for i in file_list:
     #     if os.path.isfile(os.path.join(os.getcwd(), './test/tenda ax3/js', i)):
     #         with open('./test/tenda ax3/js/' + i, 'r') as f:
@@ -102,5 +101,5 @@ if __name__ == '__main__':
     #             print(i)
     #             new_js_parser(f.read())
     #             print()
-    #             # for i in res:
-    #             #     print(i)
+                # for i in res:
+                #     print(i)
