@@ -5,40 +5,6 @@ import itertools
 from util import visitor
 
 
-def check_call_expression(node):
-    if node.callee.type == 'MemberExpression':
-        if hasattr(node.callee.object, 'name') and node.callee.object.name == '$':
-            if node.callee.property.name == 'get':
-                return 'get'
-            if node.callee.property.name == 'post':
-                return 'post'
-            if node.callee.property.name == 'ajax':
-                return 'ajax'
-    return 'not target callee'
-
-
-def find_url(node):
-    pass
-
-
-def new_js_parser(program):
-    ast = esprima.parseScript(program).toDict()
-    program = visitor.objectify(ast)
-    call_expression_node_list = program.search_by_type('CallExpression')
-    for call_expression_node in call_expression_node_list:
-        callee_name = check_call_expression(call_expression_node)
-        if callee_name == 'get':
-            # print(callee_name)
-            url_node = call_expression_node.arguments[0]
-        if callee_name == 'post':
-            if call_expression_node.arguments[0].type == 'Literal':
-                url = call_expression_node.arguments[0].value
-                print(url, end='   ')
-            print(call_expression_node.arguments[0].type)
-        if callee_name == 'ajax':
-            print(callee_name)
-
-
 def match_url(check_string):
     if isinstance(check_string, str):
         url_match_restr_1 = r'/([\w.\/?%&=]*)?'
@@ -89,18 +55,171 @@ def JSParser(program):
     return request_list
 
 
-if __name__ == '__main__':
+def check_call_expression(node):
+    if node.callee.type == 'MemberExpression':
+        if hasattr(node.callee.object, 'name') and node.callee.object.name == '$':
+            if node.callee.property.name == 'get':
+                return 'get'
+            if node.callee.property.name == 'post':
+                return 'post'
+            if node.callee.property.name == 'ajax':
+                return 'ajax'
+        elif hasattr(node.callee.object, 'object') and hasattr(node.callee.object.object,
+                                                               'name') and node.callee.object.object.name == '$':
+            if node.callee.object.property.name == 'GetSetData':
+                if node.callee.property.name == 'getData':
+                    return 'getData'
+                if node.callee.property.name == 'setData':
+                    return 'setData'
+    return 'not target callee'
+
+
+def object_expression_analysis(check_expression_node):
+    keyword = []
+    for property in check_expression_node.properties:
+        if property.key.type == 'Identifier':
+            keyword.append(property.key.name)
+        elif property.key.type == 'Literal':
+            keyword.append(property.key.value)
+    return keyword
+
+
+def url_analysis(url_node):
+    tmp = url_node.search_by_type('Literal')
     res = []
+    for literal_node in tmp:
+        if isinstance(literal_node.value, str):
+            url = literal_node.value
+            if url[len(url) - 1] == '?':
+                url = url[:len(url) - 1]
+            res.append(url)
+    if len(res) == 1:
+        return res[0]
+    return res
+
+
+def binary_expression_analysis(binary_expression_node):
+    literal_node_list = binary_expression_node.search_by_type('Literal')
+    res = []
+    for literal_node in literal_node_list:
+        if isinstance(literal_node.value, str):
+            temp = literal_node.value.split('&')
+            regex = r'\w*(?=\=)'
+            for i in temp:
+                match = re.match(regex, i)
+                if match:
+                    res.append(match.group())
+    return res
+
+
+def meixianghaomingzi(node, var_name, **kwargs):
+    def callback_search_identifer(checked_node):
+        if checked_node.type == 'Identifier' and checked_node.name == var_name:
+            return True
+        return False
+
+    param_list = []
+
+    if 'checked_list' in kwargs.keys():
+        checked_list = kwargs['checked_list']
+    else:
+        checked_list = []
+    if node.type != 'FunctionDeclaration':
+        checked_list.append(node)
+
+    function_parent_node = visitor.find_function_parent(node)
+    if function_parent_node is not None:
+        identifier_list = function_parent_node.search(callback_search_identifer)
+        for identifier in identifier_list:
+            if identifier not in checked_list:
+                if identifier.parent.type == 'VariableDeclarator':
+                    if hasattr(identifier.parent, 'init') and identifier.parent.init is not None:
+                        param_list += (binary_expression_analysis(identifier.parent.init))
+                if identifier.parent.type == 'AssignmentExpression':
+                    if identifier.parent.operator == '=':
+                        if identifier.parent.right.type == 'BinaryExpression':
+                            param_list += binary_expression_analysis(identifier.parent.right)
+                        if identifier.parent.right.type == 'ObjectExpression':
+                            param_list += object_expression_analysis(identifier.parent.right)
+                        if identifier.parent.right.type == 'Literal' and isinstance(identifier.parent.right.value, str):
+                            tmp = identifier.parent.right.value.split('$')
+                            regex = r'\w*(?=\=)'
+                            for i in tmp:
+                                match = re.match(regex, i)
+                                if match:
+                                    param_list.append(match.group())
+        if param_list is not []:
+            return param_list
+        return meixianghaomingzi(function_parent_node, var_name, checked_list=checked_list)
+    return []
+
+
+def new_js_parser(program):
+    ast = esprima.parseScript(program).toDict()
+    program = visitor.objectify(ast)
+    call_expression_node_list = program.search_by_type('CallExpression')
+    res = []
+    for call_expression_node in call_expression_node_list:
+        callee_name = check_call_expression(call_expression_node)
+        url = ''
+        keyword_list = []
+
+        # __________________________________get_and_getData_part_____________________
+        if callee_name == 'get' or callee_name == 'getData':
+            if call_expression_node.arguments[0].type == 'Literal':
+                url = call_expression_node.arguments[0].value
+            else:
+                url_node = call_expression_node.arguments[0]
+                if url_node.type == 'BinaryExpression':
+                    url = url_analysis(url_node)
+            res.append({
+                'method': 'get',
+                'url': url
+            })
+
+        # __________________________________post_and_setdata_part____________________
+        if callee_name == 'post' or callee_name == 'setData':
+            if call_expression_node.arguments[0].type == 'Literal':
+                url = call_expression_node.arguments[0].value
+            else:
+                url_node = call_expression_node.arguments[0]
+                if url_node.type == 'BinaryExpression':
+                    url = url_analysis(url_node)
+
+            if call_expression_node.arguments[1].type == 'Literal':
+                keyword_list += binary_expression_analysis(call_expression_node.arguments[1])
+            else:
+                param_node = call_expression_node.arguments[1]
+                # print("POST:  ", url, '  Type', param_node.type, '  callee: ', callee_name)
+                if param_node.type == 'Identifier':
+                    keyword_list += meixianghaomingzi(param_node, param_node.name)
+                if param_node.type == 'BinaryExpression':
+                    keyword_list += binary_expression_analysis(param_node)
+                # print(keyword_list)
+            res.append({
+                'method': 'post',
+                'url': url,
+                'parameter': keyword_list
+            })
+
+        # __________________________________ajax_part__________________________________
+        if callee_name == 'ajax':
+            pass
+    return res
+
+
+if __name__ == '__main__':
+    # with open("./test/tenda ax3/js/wifi_wps.js", 'r') as f:
+    #     for i in new_js_parser(f.read()):
+    #         print(i)
+
     file_list = os.listdir(('./test/tenda ax3/js'))
-    with open("./test/tenda ax3/js/net_control.js",'r') as f:
-        a = esprima.parseScript(f.read())
-        print(a)
-    # for i in file_list:
-    #     if os.path.isfile(os.path.join(os.getcwd(), './test/tenda ax3/js', i)):
-    #         with open('./test/tenda ax3/js/' + i, 'r') as f:
-    #             # res = JSParser(f.read())
-    #             print(i)
-    #             new_js_parser(f.read())
-    #             print()
-    #             # for i in res:
-    #             #     print(i)
+    for i in file_list:
+        if os.path.isfile(os.path.join(os.getcwd(), './test/tenda ax3/js', i)):
+            with open('./test/tenda ax3/js/' + i, 'r') as f:
+                res = new_js_parser(f.read())
+                if res:
+                    print(i)
+                    for tmp in res:
+                        print(tmp)
+                    print()
