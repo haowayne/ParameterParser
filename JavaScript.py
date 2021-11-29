@@ -5,54 +5,54 @@ import itertools
 from util import visitor
 
 
-def match_url(check_string):
-    if isinstance(check_string, str):
-        url_match_restr_1 = r'/([\w.\/?%&=]*)?'
-        url_match_restr_2 = r'([\w.\?%&=]*)/([\w.\/?%&=]*)?'
-        if re.match(url_match_restr_1, check_string) is not None:
-            return True
-        if re.match(url_match_restr_2, check_string) is not None:
-            return True
-    return False
-
-
-def JSParser(program):
-    ast = esprima.parseScript(program).toDict()
-    program = visitor.objectify(ast)
-    literal_node_list = program.search_by_type('Literal')
-    url_list = []
-    for literal_node in literal_node_list:
-        if match_url(literal_node.value):
-            url_list.append(literal_node.value)
-
-    object_node_lsit = program.search_by_type('ObjectExpression')
-    kerword_list = []
-    for object in object_node_lsit:
-        target_flag = 1
-        for property in object.properties:
-            if property.value.type != 'Identifier' and property.value.type != 'Literal' and property.value.type != 'CallExpression':
-                target_flag = 0
-        if target_flag:
-            keyword = []
-            for property in object.properties:
-                if property.key.type == 'Identifier':
-                    keyword.append(property.key.name)
-                elif property.key.type == 'Literal':
-                    keyword.append(property.key.value)
-            if len(keyword) != 0:
-                kerword_list.append(keyword)
-    combine = itertools.product(url_list, ['GET', 'POST'], kerword_list)
-    request_list = []
-    for i in combine:
-        req = {
-            'url': i[0],
-            'method': i[1],
-            'parameter': {}
-        }
-        for key in i[2]:
-            req['parameter'][key] = ''
-        request_list.append(req)
-    return request_list
+# def match_url(check_string):
+#     if isinstance(check_string, str):
+#         url_match_restr_1 = r'/([\w.\/?%&=]*)?'
+#         url_match_restr_2 = r'([\w.\?%&=]*)/([\w.\/?%&=]*)?'
+#         if re.match(url_match_restr_1, check_string) is not None:
+#             return True
+#         if re.match(url_match_restr_2, check_string) is not None:
+#             return True
+#     return False
+#
+#
+# def JSParser(program):
+#     ast = esprima.parseScript(program).toDict()
+#     program = visitor.objectify(ast)
+#     literal_node_list = program.search_by_type('Literal')
+#     url_list = []
+#     for literal_node in literal_node_list:
+#         if match_url(literal_node.value):
+#             url_list.append(literal_node.value)
+#
+#     object_node_lsit = program.search_by_type('ObjectExpression')
+#     kerword_list = []
+#     for object in object_node_lsit:
+#         target_flag = 1
+#         for property in object.properties:
+#             if property.value.type != 'Identifier' and property.value.type != 'Literal' and property.value.type != 'CallExpression':
+#                 target_flag = 0
+#         if target_flag:
+#             keyword = []
+#             for property in object.properties:
+#                 if property.key.type == 'Identifier':
+#                     keyword.append(property.key.name)
+#                 elif property.key.type == 'Literal':
+#                     keyword.append(property.key.value)
+#             if len(keyword) != 0:
+#                 kerword_list.append(keyword)
+#     combine = itertools.product(url_list, ['GET', 'POST'], kerword_list)
+#     request_list = []
+#     for i in combine:
+#         req = {
+#             'url': i[0],
+#             'method': i[1],
+#             'parameter': {}
+#         }
+#         for key in i[2]:
+#             req['parameter'][key] = ''
+#         request_list.append(req)
+#     return request_list
 
 
 def check_call_expression(node):
@@ -112,7 +112,7 @@ def binary_expression_analysis(binary_expression_node):
     return res
 
 
-def meixianghaomingzi(node, var_name, **kwargs):
+def recur_find_data(node, var_name, **kwargs):
     def callback_search_identifer(checked_node):
         if checked_node.type == 'Identifier' and checked_node.name == var_name:
             return True
@@ -150,7 +150,7 @@ def meixianghaomingzi(node, var_name, **kwargs):
                                     param_list.append(match.group())
         if param_list is not []:
             return param_list
-        return meixianghaomingzi(function_parent_node, var_name, checked_list=checked_list)
+        return recur_find_data(function_parent_node, var_name, checked_list=checked_list)
     return []
 
 
@@ -186,16 +186,14 @@ def new_js_parser(program):
                 if url_node.type == 'BinaryExpression':
                     url = url_analysis(url_node)
 
+            param_node = call_expression_node.arguments[1]
             if call_expression_node.arguments[1].type == 'Literal':
-                keyword_list += binary_expression_analysis(call_expression_node.arguments[1])
+                keyword_list += binary_expression_analysis(param_node)
             else:
-                param_node = call_expression_node.arguments[1]
-                # print("POST:  ", url, '  Type', param_node.type, '  callee: ', callee_name)
                 if param_node.type == 'Identifier':
-                    keyword_list += meixianghaomingzi(param_node, param_node.name)
+                    keyword_list += recur_find_data(param_node, param_node.name)
                 if param_node.type == 'BinaryExpression':
                     keyword_list += binary_expression_analysis(param_node)
-                # print(keyword_list)
             res.append({
                 'method': 'post',
                 'url': url,
@@ -204,14 +202,48 @@ def new_js_parser(program):
 
         # __________________________________ajax_part__________________________________
         if callee_name == 'ajax':
-            pass
+            if call_expression_node.arguments[0].type == 'ObjectExpression':
+                ajax_param = call_expression_node.arguments[0]
+                url = ''
+                method = ''
+                param_list = []
+                for property in ajax_param.properties:
+                    if property.key.type == 'Identifier':
+                        if property.key.name == 'url':
+                            if property.value.type == 'Literal':
+                                url = property.value.value
+                        if property.key.name == 'type':
+                            if property.value.type == 'Literal':
+                                method = property.value.value
+                    elif property.key.type == 'Literal':
+                        pass
+                if method.lower() == 'post':
+                    for property in ajax_param.properties:
+                        if property.key.type == 'Identifier' and property.key.name == 'data':
+                            if property.value.type == 'Identifier':
+                                param_list += recur_find_data(property.value, property.value.name)
+                            if property.value.type == 'BinaryExpression':
+                                keyword_list += binary_expression_analysis(param_node)
+                if url != '' and method != '':
+                    if method.lower() == 'get':
+                        res.append({
+                            'method': 'get',
+                            'url': url,
+                        })
+                    if method.lower() == 'post':
+                        res.append({
+                            'method': 'post',
+                            'url': url,
+                            'parameter': param_list
+                        })
     return res
 
 
 if __name__ == '__main__':
-    # with open("./test/tenda ax3/js/wifi_wps.js", 'r') as f:
-    #     for i in new_js_parser(f.read()):
-    #         print(i)
+    # with open("./test/tenda ax3/js/main.js", 'r') as f:
+    #     new_js_parser(f.read())
+    #     # for i in new_js_parser(f.read()):
+    #     #     print(i)
 
     file_list = os.listdir(('./test/tenda ax3/js'))
     for i in file_list:
@@ -220,6 +252,6 @@ if __name__ == '__main__':
                 res = new_js_parser(f.read())
                 if res:
                     print(i)
-                    for tmp in res:
-                        print(tmp)
+                    for t in res:
+                        print(t)
                     print()

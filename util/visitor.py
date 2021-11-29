@@ -69,7 +69,7 @@ def find_parent(node, callback):
         if callback(node):
             return node
         if node.type == 'Program':
-            return None
+            return node
 
 
 def find_function_parent(node):
