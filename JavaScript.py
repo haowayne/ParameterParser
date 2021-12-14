@@ -5,54 +5,57 @@ import itertools
 from util import visitor
 
 
-# def match_url(check_string):
-#     if isinstance(check_string, str):
-#         url_match_restr_1 = r'/([\w.\/?%&=]*)?'
-#         url_match_restr_2 = r'([\w.\?%&=]*)/([\w.\/?%&=]*)?'
-#         if re.match(url_match_restr_1, check_string) is not None:
-#             return True
-#         if re.match(url_match_restr_2, check_string) is not None:
-#             return True
-#     return False
-#
-#
-# def JSParser(program):
-#     ast = esprima.parseScript(program).toDict()
-#     program = visitor.objectify(ast)
-#     literal_node_list = program.search_by_type('Literal')
-#     url_list = []
-#     for literal_node in literal_node_list:
-#         if match_url(literal_node.value):
-#             url_list.append(literal_node.value)
-#
-#     object_node_lsit = program.search_by_type('ObjectExpression')
-#     kerword_list = []
-#     for object in object_node_lsit:
-#         target_flag = 1
-#         for property in object.properties:
-#             if property.value.type != 'Identifier' and property.value.type != 'Literal' and property.value.type != 'CallExpression':
-#                 target_flag = 0
-#         if target_flag:
-#             keyword = []
-#             for property in object.properties:
-#                 if property.key.type == 'Identifier':
-#                     keyword.append(property.key.name)
-#                 elif property.key.type == 'Literal':
-#                     keyword.append(property.key.value)
-#             if len(keyword) != 0:
-#                 kerword_list.append(keyword)
-#     combine = itertools.product(url_list, ['GET', 'POST'], kerword_list)
-#     request_list = []
-#     for i in combine:
-#         req = {
-#             'url': i[0],
-#             'method': i[1],
-#             'parameter': {}
-#         }
-#         for key in i[2]:
-#             req['parameter'][key] = ''
-#         request_list.append(req)
-#     return request_list
+def match_url(check_string):
+    if isinstance(check_string, str):
+        url_match_restr_1 = r'/([\w.\/?%&=]*)?'
+        url_match_restr_2 = r'([\w.\?%&=]*)/([\w.\/?%&=]*)?'
+        if re.match(url_match_restr_1, check_string) is not None:
+            return True
+        if re.match(url_match_restr_2, check_string) is not None:
+            return True
+    return False
+
+
+def coarse_grain_parse(node, url):
+    literal_node_list = node.search_by_type('Literal')
+    url_list = []
+    for literal_node in literal_node_list:
+        if match_url(literal_node.value):
+            if url == literal_node.value:
+                url_list.append(literal_node.value)
+
+    object_node_lsit = node.search_by_type('ObjectExpression')
+    kerword_list = []
+    for object in object_node_lsit:
+        target_flag = 1
+        for property in object.properties:
+            if property.value.type != 'Identifier' and property.value.type != 'Literal' and property.value.type != 'CallExpression':
+                target_flag = 0
+        if target_flag:
+            keyword = []
+            for property in object.properties:
+                if property.key.type == 'Identifier':
+                    if not property.key.name.isalpha():
+                        break
+                    keyword.append(property.key.name)
+                elif property.key.type == 'Literal':
+                    if not property.key.value.isalpha():
+                        break
+                    keyword.append(property.key.value)
+            if len(keyword) != 0:
+                kerword_list.append(keyword)
+    combine = itertools.product(url_list, kerword_list)
+    request_list = []
+    for i in combine:
+        req = {
+            'method': 'post',
+            'url': i[0],
+            'parameter': []
+        }
+        for key in i[1]:
+            req['parameter'].append(key)
+        request_list.append(req)
+    return request_list
 
 
 def check_call_expression(node):
@@ -154,9 +157,7 @@ def recur_find_data(node, var_name, **kwargs):
     return []
 
 
-def new_js_parser(program):
-    ast = esprima.parseScript(program).toDict()
-    program = visitor.objectify(ast)
+def fine_grained_parse(program):
     call_expression_node_list = program.search_by_type('CallExpression')
     res = []
     for call_expression_node in call_expression_node_list:
@@ -239,19 +240,37 @@ def new_js_parser(program):
     return res
 
 
-if __name__ == '__main__':
-    # with open("./test/tenda ax3/js/main.js", 'r') as f:
-    #     new_js_parser(f.read())
-    #     # for i in new_js_parser(f.read()):
-    #     #     print(i)
+def javascript_parser(program):
+    ast = esprima.parseScript(program).toDict()
+    program = visitor.objectify(ast)
+    result_list = fine_grained_parse(program)
+    del_list = []
 
-    file_list = os.listdir(('./test/tenda ax3/js'))
-    for i in file_list:
-        if os.path.isfile(os.path.join(os.getcwd(), './test/tenda ax3/js', i)):
-            with open('./test/tenda ax3/js/' + i, 'r') as f:
-                res = new_js_parser(f.read())
-                if res:
-                    print(i)
-                    for t in res:
-                        print(t)
-                    print()
+    for tmp in result_list:
+        if tmp['method'] == 'post' and tmp['parameter'] == [] and tmp['url'] != '':
+            result_list += coarse_grain_parse(program, tmp['url'])
+            del_list.append(tmp)
+    for i in del_list:
+        result_list.remove(i)
+
+    return result_list
+
+
+if __name__ == '__main__':
+    with open("./test/tenda ax3/js/main.js", 'r') as f:
+        res = javascript_parser(f.read())
+        if res:
+            for t in res:
+                print(t)
+
+    # file_list = os.listdir(('./test/tenda ax3/js'))
+    # for i in file_list:
+    #     if os.path.isfile(os.path.join(os.getcwd(), './test/tenda ax3/js', i)):
+    #         with open('./test/tenda ax3/js/' + i, 'r') as f:
+    #             res = javascript_parser(f.read())
+    #
+    #             if res:
+    #                 print(i)
+    #                 for t in res:
+    #                     print(t)
+    #                 print()
