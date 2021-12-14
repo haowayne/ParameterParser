@@ -17,6 +17,14 @@ class Node(abc.ABC):
         for field in self.fields:
             setattr(self, field, objectify(data.get(field), self))
 
+    @property
+    def type(self) -> str:
+        return self.__class__.__name__
+
+    @property
+    def parent(self):
+        return self.__parent
+
     def dict(self) -> Dict[str, Any]:
         result = OrderedDict({'type': self.type})  # type: Dict[str, Any]
         for field in self.fields:
@@ -39,24 +47,42 @@ class Node(abc.ABC):
                 for node in val:
                     yield from node.traverse()
 
-    def search_by_type(self, node_type) -> List['Node']:
+    def search(self, callback):
         search_list = []
         for node in self.traverse():
-            if node.type == node_type:
+            if callback(node):
                 search_list.append(node)
         return search_list
 
-    @property
-    def type(self) -> str:
-        return self.__class__.__name__
+    def search_by_type(self, node_type) -> List['Node']:
+        def callback(node):
+            if node.type is node_type:
+                return True
+            return False
 
-    @property
-    def parent(self):
-        return self.__parent
+        return self.search(callback)
+
+
+def find_parent(node, callback):
+    while True:
+        node = node.parent
+        if callback(node):
+            return node
+        if node.type == 'Program':
+            return node
+
+
+def find_function_parent(node):
+    def callback(checked_node):
+        if checked_node.type == 'FunctionDeclaration':
+            return True
+        return False
+
+    return find_parent(node, callback)
 
 
 def objectify(data: Union[None, Dict[str, Any], List[Dict[str, Any]]], parent=None) -> Union[
-    None, Dict[str, Any], List[Any], Node]:
+    Dict[str, Any], List[Any], Node]:
     if not isinstance(data, (dict, list)):
         return data
     if isinstance(data, dict):
